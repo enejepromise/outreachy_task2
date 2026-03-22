@@ -2,25 +2,30 @@
 
 **Outreachy Internship Contribution — Lusophone Technological Wishlist**  
 Submitted by: PROMZYBA
+
 ---
 
 ## The Problem
+
 Given a CSV file containing a list of URLs, the task is to:
 
-- Read each URL from the file  
-- Send a request to check if it is reachable  
-- Print the HTTP status code in this format:
-(STATUS_CODE) URL
+- Read each URL from the file
+- Send a request to check if it is reachable
+- Print the HTTP status code for each URL in this format:
+```
+(STATUS_CODE)  URL
+```
 
 ---
 
 ## The Real Challenge
+
 In real-world systems, checking URLs involves more than just sending requests:
 
-- Some URLs are malformed or incomplete  
-- Some servers do not respond properly to certain request types  
-- Sequential checking is slow for large datasets  
-- Untrusted input (CSV) can introduce security risks  
+- Some URLs are malformed or incomplete
+- Some servers do not respond properly to certain request types
+- Checking URLs sequentially is too slow for large datasets
+- Untrusted input from a CSV file can introduce security risks
 
 ---
 
@@ -28,148 +33,205 @@ In real-world systems, checking URLs involves more than just sending requests:
 
 This project goes beyond the basic requirement by building a **fast, reliable, and security-aware URL checker**.
 
-### Core idea:
-> Validate → Secure → Check concurrently → Present clearly
+### Core Philosophy
+```
+Validate → Secure → Check Concurrently → Present Clearly
+```
 
 ---
 
 ## What Was Implemented
 
-### 1. Asynchronous Processing (Performance)
+### 1. Asynchronous Processing *(Performance)*
 
-Instead of checking URLs one by one, this tool uses:
-
-- `asyncio` + `httpx.AsyncClient`
-
-This allows multiple URLs to be checked **at the same time**, significantly improving speed.
+Instead of checking URLs one by one, the tool uses `asyncio` and `httpx.AsyncClient` to check multiple URLs **at the same time**, significantly reducing total execution time on large datasets.
 
 ---
 
 ### 2. URL Cleaning & Normalization
 
-Many URLs in real datasets are incomplete.
-The script automatically fixes missing schemes before processing.
+Many URLs in real datasets are written without a scheme. The script automatically prepends `https://` where missing before any processing begins.
+```
+example.com  →  https://example.com
+```
 
 ---
 
 ### 3. Input Validation
 
-Only valid URLs are processed:
-- Must include `http` or `https`
-- Must contain a valid hostname
+Only well-formed URLs are processed. Every URL must:
 
-Invalid entries are safely skipped.
+- Use the `http` or `https` scheme
+- Contain a valid hostname
+
+Invalid entries are safely skipped and flagged in the terminal output.
+
+---
+
+### 4. SSRF Protection *(Security)*
+
+To reflect real-world security awareness, the script blocks any URL that resolves to an internal or private IP address, including:
+
+- Private ranges — `192.168.x.x`, `10.x.x.x`
+- Loopback — `127.0.0.1`
+- Reserved/internal networks
+
+This prevents the tool from unintentionally probing internal systems when processing untrusted input.
 
 ---
 
-### 4. Security Enhancement (Custom Addition)
-
-To stand out and reflect real-world awareness, additional security checks were implemented.
-
-#### SSRF Protection Awareness
-
-The script blocks URLs that resolve to:
-
-- Private IP addresses (`192.168.x.x`)
-- Loopback addresses (`127.0.0.1`)
-- Reserved/internal networks  
-
-This prevents the tool from unintentionally interacting with internal systems.
-
----
 ### 5. Controlled Concurrency
-A semaphore limits the number of simultaneous requests.
 
-This prevents:
-- Overloading external servers  
-- Network instability  
-- Unintentional abuse of endpoints  
+A semaphore limits the number of simultaneous requests to **20 at a time**. This prevents:
+
+- Overloading external servers
+- Network instability on the client side
+- Unintentional abuse of third-party endpoints
 
 ---
 
 ### 6. HEAD → GET Fallback Strategy
 
-Some servers do not support `HEAD` requests.
+Not all servers support `HEAD` requests. To maximise reliability:
 
-To improve reliability:
-- The script first attempts a `HEAD` request (faster)
-- If it fails, it retries with `GET`
+1. The script first attempts a `HEAD` request *(lightweight — no body downloaded)*
+2. If the server returns an error, it automatically retries with a full `GET` request
+
 ---
+
 ### 7. Error Handling
 
-The script gracefully handles real-world failures:
+The script handles all common real-world failure scenarios without crashing:
 
-- Timeout errors  
-- Connection failures  
-- Too many redirects  
-- Unexpected request errors  
+| Error | Label Shown |
+|---|---|
+| Server took too long | `TIMEOUT` |
+| Could not reach server | `CONNECTION_ERROR` |
+| Redirect loop detected | `TOO_MANY_REDIRECTS` |
+| Any other network issue | `REQUEST_ERROR(...)` |
+
 ---
+
 ### 8. Live Progress Feedback
 
-As URLs are being checked, the script displays
-This improves usability and transparency.
----
+As URLs are checked, the terminal displays real-time progress:
+```
+  [1/155] Checked: https://www.google.com
+  [2/155] Checked: https://www.github.com
+  ...
+```
 
-### 9. Clean & Readable Output
-
-Results are displayed in a structured and readable format:
-(200)  https://www.espn.com.br/futebol/bola-de-prata/artigo/_/id/8242963/bola-de-prata-espnw-em-nome-do-avo-julia-bianchi-da-nova-cara-ao-futebol-feminino-e-fecha-temporada-como-a-melhor-do-brasil
-(403)  https://www.sports-reference.com/olympics.html
-(503)  http://www.espn.com.br/noticia/667127_aos-38-anos-volante-formiga-acerta-com-o-paris-saint-germain
-(CONNECTION_ERROR) https://www.dailybreeze.com/sports/ci_12896074
-
-
-- ✅ Green → Success  
-- ❌ Red → HTTP error  
-- ⚠️ Yellow → Network issue  
+This improves transparency and confirms the tool is actively running.
 
 ---
 
-### 10. Result Sorting
+### 9. Colour-Coded Output
 
-Final output is organized for clarity:
+Results are displayed with colour to make them immediately readable:
+```
+  (200)  https://www.google.com
+  (404)  https://this-page-is-gone.com
+  (TIMEOUT)  https://slow-server.com
+```
 
-- Successful responses first  
-- Errors and failures after  
+| Colour | Meaning |
+|---|---|
+| 🟢 Green | Success — page is reachable |
+| 🔴 Red | HTTP error — page exists but returned an error |
+| 🟡 Yellow | Network issue — could not connect at all |
+
+---
+
+### 10. Sorted Results
+
+The final output is organised for easy review:
+
+- Successful responses appear first
+- Errors and failures appear at the bottom
 
 ---
 
 ### 11. Summary & Execution Time
 
-At the end, the script provides:
-Total URLs checked  :  155
-Reachable  (< 400)  :  120
-Unreachable / Error :  35
+After all URLs are checked, a clear summary is printed:
+```
 ───────────────────────────────────────────────────────
-Finished in 104.74 seconds
+  Total URLs checked  :  155
+  Reachable  (< 400)  :  120
+  Unreachable / Error :  35
+───────────────────────────────────────────────────────
+
+  Finished in 104.74 seconds
+```
+
+---
 
 ## Project Structure
+```
 Outreachy_task2/
-├── url_status_checker.py
-├── Task 2 - Intern.csv
-└── README.md
+├── url_status_checker.py    # Main script
+├── Task 2 - Intern.csv      # Input CSV file containing URLs
+└── README.md                # Project documentation
+```
 
 ---
+
 ## How to Run
 
-### 1. Install dependency
+### Step 1 — Install the dependency
+```bash
 pip install httpx
+```
+
+### Step 2 — Place your CSV file in the same folder as the script
+
+Ensure the CSV has a column named exactly `urls`:
+```csv
+urls
+https://www.google.com
+https://www.github.com
+```
+
+### Step 3 — Run the script
+```bash
+python url_status_checker.py
+```
+
+Or pass a custom file name directly:
+```bash
+python url_status_checker.py "Task 2 - Intern.csv"
+```
+
+> Use quotes around the file name if it contains spaces.
 
 ---
 
-### 2. Run the script
-python check_url_status.py
+## Configuration
+
+Key settings can be adjusted at the top of the script:
+
+| Setting | Default | Description |
+|---|---|---|
+| `CSV_FILE_PATH` | `Task 2 - Intern.csv` | Default input file |
+| `URL_COLUMN_NAME` | `urls` | CSV column containing the URLs |
+| `REQUEST_TIMEOUT` | `10` | Seconds before a request times out |
+| `MAX_CONCURRENT` | `20` | Maximum simultaneous requests |
+| `FOLLOW_REDIRECTS` | `True` | Whether to follow 301/302 redirects |
 
 ---
 
 ## Key Takeaway
 
-This project demonstrates not just the ability to complete the task, but to think beyond it:
-- Performance (async execution)  
-- Reliability (fallback strategies)  
-- Security awareness (input validation + SSRF protection)  
-- Usability (progress tracking + clean output)  
+This project demonstrates not just the ability to complete the task, but to **think beyond it**:
+
+- **Performance** — async execution for fast, concurrent URL checking
+- **Reliability** — HEAD → GET fallback to handle non-standard servers
+- **Security** — input validation and SSRF protection against untrusted data
+- **Usability** — live progress, colour-coded output, and a clean summary
+
 ---
 
 ## Author
-PROMZYBA
+
+**PROMZYBA**  
+Outreachy Internship Applicant — Cycle 32
