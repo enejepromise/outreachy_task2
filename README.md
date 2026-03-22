@@ -183,9 +183,9 @@ Outreachy_task2/
 pip install httpx
 ```
 
-### Step 2 — Place your CSV file in the same folder as the script
+### Step 2 — Place the CSV file in the same folder as the script
 
-Ensure the CSV has a column named exactly `urls`:
+Ensured the CSV has a column named exactly `urls`:
 ```csv
 urls
 https://www.google.com
@@ -202,7 +202,7 @@ Or pass a custom file name directly:
 python url_status_checker.py "Task 2 - Intern.csv"
 ```
 
-> Use quotes around the file name if it contains spaces.
+
 
 ---
 
